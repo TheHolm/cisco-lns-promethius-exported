@@ -1,6 +1,6 @@
 # Prometheus exporter for Per-User usage from Cisco LNSs
 
-Exporter for Promethus allows you to graph traffic usage on "per username" basis.  It provide metric in formate listed bellow.  Supports only LNSes based Cisco XE based routers. 
+Exporter for Promethus allows you to graph traffic usage on "per username" basis.  It provide metric in formate listed bellow.  Supports only LNSes based Cisco XE based routers.
 
 ```
 # TYPE ifOutOctets counter
@@ -29,7 +29,7 @@ positional arguments:
 optional arguments:
   -h, --help     show this help message and exit
   -c community   SNMPv2 community string
-  -p http_port   HTTP port to listen for Promethius scrapper, default 8000
+  -p http_port   HTTP port to listen for Promethius scrapper, default 9694
   -i bind_to_ip  IP address where HTTP server will listen, default all
                  interfaces
 ```
@@ -51,7 +51,7 @@ scrape_configs:
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: 127.0.0.1:8000  # SNMP exporter.
+        replacement: 127.0.0.1:9694  # SNMP exporter.
 ```
 
 ## Q/A
@@ -60,4 +60,4 @@ scrape_configs:
 
 ## To Do
 1. SNMPv3 suppport
-1. Register lintening port in Prometheus database.
+1. Register in Prometheus database.

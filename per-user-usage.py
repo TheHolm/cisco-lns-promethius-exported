@@ -4,8 +4,6 @@ import threading
 import argparse
 import time
 
-HTTP_PORT_NUMBER = 8000
-
 def get_l2tp_users(SNMP_target,auth_data,circuit_ids):
         thread_data = threading.local()
         print('Getting L2TP users...', flush=True)
@@ -212,8 +210,8 @@ if __name__ == '__main__':
                     help='SNMPv2 community string')
     parser.add_argument('-s', metavar='snmp_port', type=int, default=161,
                         help='SNMP destination UDP port, default 161')
-    parser.add_argument('-p', metavar='http_port', type=int, default=8000,
-                    help='HTTP port to listen for Promethius scrapper, default 8000')
+    parser.add_argument('-p', metavar='http_port', type=int, default=9694,
+                    help='HTTP port to listen for Promethius scrapper, default 9694')
     parser.add_argument('-i', metavar='bind_to_ip', type=str, default="",
                     help='IP address where HTTP server will listen, default all interfaces')
     args = vars(parser.parse_args())
@@ -221,7 +219,6 @@ if __name__ == '__main__':
     HTTP_BIND_IP = args['i']
     SNMP_COMMUNITY = args['c']
     SNMP_UDP_PORT = args['s']
-    print(str(args))
     # starting server
     server_class = MyHandler
     httpd = http.server.ThreadingHTTPServer((HTTP_BIND_IP, HTTP_PORT_NUMBER), server_class)
