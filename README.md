@@ -55,9 +55,9 @@ scrape_configs:
 ```
 
 ## Q/A
-.1  Q: Why SNMP walk not SNMP Bulk.
+1.  Q: Why SNMP walk not SNMP Bulk.
     A: For some reason SNMP Bulk does not return sane results, I have no idea what causing it. Walking is working just fine for me.
 
 ## To Do
-.1 SNMPv3 suppport
-.2 Register lintening port in Prometheus database.
+1. SNMPv3 suppport
+1. Register lintening port in Prometheus database.
