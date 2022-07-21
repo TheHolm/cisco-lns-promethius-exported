@@ -1,31 +1,24 @@
 # Prometheus exporter for Per-User usage from Cisco LNSs
 
-Exporter for Promethus allows you to graph traffic usage on "per username" basis. It provide metric in formate listed bellow. Supports only LNSes
+Exporter for Promethus allows you to graph traffic usage on "per username" basis. It provides metric in the format listed bellow. Supports only LNSes
 based Cisco XE based routers.
+
+Added export for LNS sessions uptime per username.
 
 ```
 # TYPE ifOutOctets counter
 ifOutOctets{ user="user1@exaample.com" } 1912961758
 # TYPE ifInOctets counter
 ifInOctets{ user="user1@exaample.com" } 1241623498
+# TYPE Sessions Uptime
+sessionUpTime{sessionUpTime{ user="examle@exampldomain.com" } 123456
 # TYPE total_l2tp_sessions summary
 total_l2tp_sessions 1
 # TYPE request_processing_seconds summary
 request_processing_seconds 7.061648626986425
 ```
 
-Added export for LNS sessions uptime per username. 
-
-```shell
-sessionUpTime{ user="examle@exampldomain.com" } 1 day, 1:09:02.430000
-# TYPE total_l2tp_sessions summary
-total_l2tp_sessions 1234
-# TYPE request_processing_seconds summary
-request_processing_seconds 37.14100000000326
-
-```
-
-## Requrements:
+## Requirements:
 
 * Python 3.7
 * pysnmp
@@ -77,10 +70,6 @@ scrape_configs:
 #### Get Usage
 
 To get usage, submit a GET request to /?target=yourlns.example.com
-
-#### Get Sessions Uptime
-
-To get sessions uptime, submit a GET request to /get_sessions_uptime/?target=yourlns.example.com
 
 ## Q/A
 

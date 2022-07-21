@@ -35,7 +35,7 @@ def get_l2tp_users(SNMP_target, auth_data, circuit_ids):
             for thread_data.varBind in thread_data.varBinds:
                 thread_data.uid = str(thread_data.varBind[0]).split(".")
                 if str(thread_data.varBind[1]) != "":
-                    circuit_ids[str(thread_data.uid[-2] + '.' + thread_data.uid[-1])] = str(thread_data.varBind[1])
+                    circuit_ids[thread_data.uid[-2] + '.' + thread_data.uid[-1]] = str(thread_data.varBind[1])
 
     print(str(len(circuit_ids)) + ' users found')
 
@@ -68,7 +68,7 @@ def get_interface_ids(SNMP_target, auth_data, interface_IDs):
             for thread_data.varBind in thread_data.varBinds:
                 thread_data.uid = str(thread_data.varBind[0]).split(".")
                 try:
-                    interface_IDs[str(thread_data.varBind[1])] = str(thread_data.uid[-2] + '.' + thread_data.uid[-1])
+                    interface_IDs[str(thread_data.varBind[1])] = thread_data.uid[-2] + '.' + thread_data.uid[-1]
                 except KeyError:
                     pass
 
@@ -112,12 +112,6 @@ def get_int_stats(SNMP_target, auth_data, interface_data, OID):
     print('Got ' + str(len(interface_data)) + ' data entries for OID: ' + OID)
 
 
-def convert_timetick_to_datetime(ticks):
-    """This function converts timetick to timedelta"""
-    seconds = ticks / 100
-    return_time_delta = (datetime.timedelta(seconds=seconds))
-    return return_time_delta
-
 
 def collect_session_data_from_lns(SNMP_target, auth_data, sessions_uptime, OID):
     print('Getting stats for OID: ', OID, flush=True)
@@ -148,8 +142,8 @@ def collect_session_data_from_lns(SNMP_target, auth_data, sessions_uptime, OID):
             for thread_data.varBind in thread_data.varBinds:
                 thread_data.uid = str(thread_data.varBind[0]).split(".")
                 try:
-                    time_delta_string = convert_timetick_to_datetime(int(thread_data.varBind[1]))
-                    sessions_uptime[str(thread_data.uid[-2] + '.' + thread_data.uid[-1])] = str(time_delta_string)
+                    # returning this as timetick as requested
+                    sessions_uptime[thread_data.uid[-2] + '.' + thread_data.uid[-1]] = int(thread_data.varBind[1])
                 except KeyError as e:
                     print(f"KeyError: {e} for {thread_data.varBind}")
 
@@ -227,10 +221,23 @@ def get_usage(auth_data, SNMP_target):
     t4 = threading.Thread(target=get_int_stats, args=(SNMP_target, auth_data, interface_TX_data, '1.3.6.1.2.1.2.2.1.16'))
     t4.start()
 
+    uptime_data = {}
+    """ 
+    datastructure like, where the first element is the mapper, second is a string of timedelta:
+
+    {
+    '9796.787': '36 days, 11:34:49.100000',
+    '9796.787': '36 days, 11:34:49.100000'
+     }
+    """
+    t5 = threading.Thread(target=collect_session_data_from_lns, args=(SNMP_target, auth_data, uptime_data, '1.3.6.1.4.1.9.10.24.1.3.2.1.4'))
+    t5.start()
+
     t1.join()
     t2.join()
     t3.join()
     t4.join()
+    t5.join()
 
     # print(next(iter(circuit_ids.items())),next(iter(interface_IDs.items())),next(iter(interface_RX_data.items())))
 
@@ -240,11 +247,17 @@ def get_usage(auth_data, SNMP_target):
         try:
             users_stats[circuit_ids[interface_IDs[interface_ID]]] = {
                 "RX_Octets": interface_RX_data[interface_ID],
-                "TX_Octets": interface_TX_data[interface_ID]
+                "TX_Octets": interface_TX_data[interface_ID],
                 }
         except KeyError as e:
-            print(e)
             pass  # some data missing for interface ID, just ignoring it
+
+    # Mapping on a different item, needs a separate loop
+    for interface_ID, mapper_item in interface_IDs.items():
+        try:
+            users_stats[circuit_ids[mapper_item]]["session_uptime"] = uptime_data[mapper_item]
+        except KeyError as e:
+            print(f'Key error mapping session_uptime: {e}')
 
     print('Done')
     return (users_stats)
@@ -280,31 +293,27 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
         auth_data = CommunityData(SNMP_COMMUNITY, mpModel=0)
         SNMP_target = UdpTransportTarget((dest_host, SNMP_UDP_PORT))
 
-        """Routing is done here. I don't want to change anything to the current workflow, not to introduce breaking changes. Will need to be reviewed."""
+        response = "# TYPE ifOutOctets counter\n"
+        users_stats = get_usage(auth_data, SNMP_target)
+        for username in users_stats.keys():
+            try:
+                response = response + 'ifOutOctets{ user="' + username + '" } ' + str(users_stats[username]['TX_Octets']) + '\n'
+            except KeyError:
+                pass
 
-        if "/get_sessions_uptime/?target=" in self.path:
-            response = "# TYPE Sessions Uptime\n"
-            users_stats = get_sessions_uptime(auth_data, SNMP_target)
-            for username in users_stats.keys():
-                try:
-                    response = response + 'sessionUpTime{ user="' + username + '" } ' + str(users_stats[username]['session_uptime']) + '\n'
-                except KeyError:
-                    pass
-        else:
-            response = "# TYPE ifOutOctets counter\n"
-            users_stats = get_usage(auth_data, SNMP_target)
-            for username in users_stats.keys():
-                try:
-                    response = response + 'ifOutOctets{ user="' + username + '" } ' + str(users_stats[username]['TX_Octets']) + '\n'
-                except KeyError:
-                    pass
+        response = response + "# TYPE ifInOctets counter\n"
+        for username in users_stats.keys():
+            try:
+                response = response + 'ifInOctets{ user="' + username + '" } ' + str(users_stats[username]['RX_Octets']) + '\n'
+            except KeyError:
+                pass
 
-            response = response + "# TYPE ifInOctets counter\n"
-            for username in users_stats.keys():
-                try:
-                    response = response + 'ifInOctets{ user="' + username + '" } ' + str(users_stats[username]['RX_Octets']) + '\n'
-                except KeyError:
-                    pass
+        response += "# TYPE Sessions Uptime\n"
+        for username in users_stats.keys():
+            try:
+                response += 'sessionUpTime{ user="' + username + '" } ' + str(users_stats[username]['session_uptime']) + '\n'
+            except KeyError:
+                pass
 
         response = response + '# TYPE total_l2tp_sessions summary\n'
         response = response + 'total_l2tp_sessions ' + str(len(users_stats)) + '\n'
