@@ -1,6 +1,7 @@
 # Prometheus exporter for Per-User usage from Cisco LNSs
 
-Exporter for Promethus allows you to graph traffic usage on "per username" basis.  It provide metric in formate listed bellow.  Supports only LNSes based Cisco XE based routers.
+Exporter for Promethus allows you to graph traffic usage on "per username" basis. It provide metric in formate listed bellow. Supports only LNSes
+based Cisco XE based routers.
 
 ```
 # TYPE ifOutOctets counter
@@ -12,12 +13,27 @@ total_l2tp_sessions 1
 # TYPE request_processing_seconds summary
 request_processing_seconds 7.061648626986425
 ```
+
+Added export for LNS sessions uptime per username. 
+
+```shell
+sessionUpTime{ user="examle@exampldomain.com" } 1 day, 1:09:02.430000
+# TYPE total_l2tp_sessions summary
+total_l2tp_sessions 1234
+# TYPE request_processing_seconds summary
+request_processing_seconds 37.14100000000326
+
+```
+
 ## Requrements:
+
 * Python 3.7
 * pysnmp
 
 ## Usage:
+
 1. Running exporter
+
 ```
 usage: per-user-usage.py [-h] -c community [-p http_port] [-i bind_to_ip] -s
 
@@ -33,8 +49,10 @@ optional arguments:
   -i bind_to_ip  IP address where HTTP server will listen, default all
                  interfaces
 ```
+
 1. Configure Prometheus
-Add to prometheus.yml
+   Add to prometheus.yml
+
 ```
 scrape_configs:
   - job_name: 'LNSes'
@@ -54,10 +72,45 @@ scrape_configs:
         replacement: 127.0.0.1:9694  # SNMP exporter.
 ```
 
+### GET requests
+
+#### Get Usage
+
+To get usage, submit a GET request to /?target=yourlns.example.com
+
+#### Get Sessions Uptime
+
+To get sessions uptime, submit a GET request to /get_sessions_uptime/?target=yourlns.example.com
+
 ## Q/A
-1.  Q: Why SNMP walk not SNMP Bulk.
-    A: For some reason SNMP Bulk does not return sane results, I have no idea what causing it. Walking is working just fine for me.
+
+1. Q: Why SNMP walk not SNMP Bulk.
+   A: For some reason SNMP Bulk does not return sane results, I have no idea what causing it. Walking is working just fine for me.
 
 ## To Do
+
 1. SNMPv3 suppport
-1. Register in Prometheus database.
+2. Register in Prometheus database.
+
+## Mapping
+
+interface_IDs is a dictrionary that works as a mapper between circuit_ids and uptime_data. This is needed to return the correct entries when combining
+to response.
+
+```python
+interface_IDs={
+    'interface_ID':'mapper_item'
+    }
+```
+
+```python
+circuit_ids = {
+    'mapper_item': 'ppp_username',
+    }
+```
+
+```python
+uptime_data = {
+    'mapper_item': 'timedelta_string',
+    }
+```
