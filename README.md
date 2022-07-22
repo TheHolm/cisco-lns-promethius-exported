@@ -10,8 +10,8 @@ Added export for LNS sessions uptime per username.
 ifOutOctets{ user="user1@exaample.com" } 1912961758
 # TYPE ifInOctets counter
 ifInOctets{ user="user1@exaample.com" } 1241623498
-# TYPE Sessions Uptime
-sessionUpTime{sessionUpTime{ user="examle@exampldomain.com" } 123456
+# TYPE Sessions Uptime in seconds
+sessionUpTime{ user="examle@exampldomain.com" } 123456
 # TYPE total_l2tp_sessions summary
 total_l2tp_sessions 1
 # TYPE request_processing_seconds summary
@@ -79,27 +79,3 @@ To get usage, submit a GET request to /?target=yourlns.example.com
 ## To Do
 
 1. SNMPv3 suppport
-2. Register in Prometheus database.
-
-## Mapping
-
-interface_IDs is a dictrionary that works as a mapper between circuit_ids and uptime_data. This is needed to return the correct entries when combining
-to response.
-
-```python
-interface_IDs={
-    'interface_ID':'mapper_item'
-    }
-```
-
-```python
-circuit_ids = {
-    'mapper_item': 'ppp_username',
-    }
-```
-
-```python
-uptime_data = {
-    'mapper_item': 'timedelta_string',
-    }
-```

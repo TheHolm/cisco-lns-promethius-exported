@@ -7,9 +7,12 @@ import argparse
 import time
 
 
-def get_l2tp_users(SNMP_target, auth_data, circuit_ids):
+def get_l2tp_session_stats(SNMP_target, auth_data, results,OID,data_as_index=False):
+    # getting info about l2tp session
+    # if data_as_index is True then SNMP data will be used is index and L2TPtunnel.LTPSession as value
+    # if data_as_index is false then L2TPtunnel.LTPSession will be used is index and SNMP data as value
     thread_data = threading.local()
-    print('Getting L2TP users...', flush=True)
+    print('Getting stats for OID: ', OID, flush=True)
     for (thread_data.errorIndication,
          thread_data.errorStatus,
          thread_data.errorIndex,
@@ -18,7 +21,7 @@ def get_l2tp_users(SNMP_target, auth_data, circuit_ids):
         auth_data,
         SNMP_target,
         ContextData(),
-        ObjectType(ObjectIdentity('.1.3.6.1.4.1.9.10.24.1.3.2.1.2.2')),
+        ObjectType(ObjectIdentity(OID)),
         lexicographicMode=False
         ):
 
@@ -35,44 +38,12 @@ def get_l2tp_users(SNMP_target, auth_data, circuit_ids):
             for thread_data.varBind in thread_data.varBinds:
                 thread_data.uid = str(thread_data.varBind[0]).split(".")
                 if str(thread_data.varBind[1]) != "":
-                    circuit_ids[thread_data.uid[-2] + '.' + thread_data.uid[-1]] = str(thread_data.varBind[1])
+                    if(data_as_index) :
+                        results[str(thread_data.varBind[1])] = thread_data.uid[-2] + '.' + thread_data.uid[-1]
+                    else:
+                        results[thread_data.uid[-2] + '.' + thread_data.uid[-1]] = str(thread_data.varBind[1])
 
-    print(str(len(circuit_ids)) + ' users found')
-
-
-def get_interface_ids(SNMP_target, auth_data, interface_IDs):
-    thread_data = threading.local()
-    print('Finding interface indexes...', flush=True)
-    for (thread_data.errorIndication,
-         thread_data.errorStatus,
-         thread_data.errorIndex,
-         thread_data.varBinds) in nextCmd(
-        SnmpEngine(),
-        auth_data,
-        SNMP_target,
-        ContextData(),
-        ObjectType(ObjectIdentity('.1.3.6.1.4.1.9.10.24.1.3.2.1.11')),
-        lexicographicMode=False
-        ):
-
-        if thread_data.errorIndication:
-            print(thread_data.errorIndication)
-            break
-        elif thread_data.errorStatus:
-            print(
-                '%s at %s' % (thread_data.errorStatus.prettyPrint(),
-                              thread_data.errorIndex and thread_data.varBinds[int(thread_data.errorIndex) - 1][0] or '?')
-                )
-            break
-        else:
-            for thread_data.varBind in thread_data.varBinds:
-                thread_data.uid = str(thread_data.varBind[0]).split(".")
-                try:
-                    interface_IDs[str(thread_data.varBind[1])] = thread_data.uid[-2] + '.' + thread_data.uid[-1]
-                except KeyError:
-                    pass
-
-    print('Got Vi interface names  for ' + str(len(interface_IDs)) + ' interfaces')
+    print('Got ' + str(len(results)) + ' data entries for OID: ' + OID)
 
 
 def get_int_stats(SNMP_target, auth_data, interface_data, OID):
@@ -112,105 +83,17 @@ def get_int_stats(SNMP_target, auth_data, interface_data, OID):
     print('Got ' + str(len(interface_data)) + ' data entries for OID: ' + OID)
 
 
-
-def collect_session_data_from_lns(SNMP_target, auth_data, sessions_uptime, OID):
-    print('Getting stats for OID: ', OID, flush=True)
-    thread_data = threading.local()
-    for (thread_data.errorIndication,
-         thread_data.errorStatus,
-         thread_data.errorIndex,
-         thread_data.varBinds) in nextCmd(
-        SnmpEngine(),
-        auth_data,
-        SNMP_target,
-        ContextData(),
-        ObjectType(ObjectIdentity(OID)),
-        # ObjectType(ObjectIdentity('1.3.6.1.2.1.31.1.1.1.6')), # (64 bit - but not supported by Cisco)
-        lexicographicMode=False
-        ):
-
-        if thread_data.errorIndication:
-            print(thread_data.errorIndication)
-            break
-        elif thread_data.errorStatus:
-            print(
-                '%s at %s' % (thread_data.errorStatus.prettyPrint(),
-                              thread_data.errorIndex and thread_data.varBinds[int(thread_data.errorIndex) - 1][0] or '?')
-                )
-            break
-        else:
-            for thread_data.varBind in thread_data.varBinds:
-                thread_data.uid = str(thread_data.varBind[0]).split(".")
-                try:
-                    # returning this as timetick as requested
-                    sessions_uptime[thread_data.uid[-2] + '.' + thread_data.uid[-1]] = int(thread_data.varBind[1])
-                except KeyError as e:
-                    print(f"KeyError: {e} for {thread_data.varBind}")
-
-    print(f"Got {len(sessions_uptime)} session uptime records for OID: {OID}")
-
-
-def get_sessions_uptime(auth_data, SNMP_target):
-    # launching threads to collect data.
-    # if more indexes is requred it is good time to conver it to loop.
-
-    circuit_ids = {}
-    t1 = threading.Thread(target=get_l2tp_users, args=(SNMP_target, auth_data, circuit_ids))
-    t1.start()
-
-    interface_IDs = {}
-    t2 = threading.Thread(target=get_interface_ids, args=(SNMP_target, auth_data, interface_IDs))
-    t2.start()
-
-    uptime_data = {}
-    """ 
-    datastructure like, where the first element is the mapper, second is a string of timedelta:
-
-    {
-    '9796.787': '36 days, 11:34:49.100000',
-    '9796.787': '36 days, 11:34:49.100000'
-     }
-    """
-    t3 = threading.Thread(target=collect_session_data_from_lns, args=(SNMP_target, auth_data, uptime_data, '1.3.6.1.4.1.9.10.24.1.3.2.1.4'))
-    t3.start()
-
-    t1.join()
-    t2.join()
-    t3.join()
-
-    print('Combining collected data for sessions uptime')
-    users_stats = {}
-    for interface_ID, mapper_item in interface_IDs.items():
-        try:
-            """
-            circuit_ids dictionary contains :
-            {
-            'interface_id':'mapper_item',
-            }
-            
-            each 
-            """
-            users_stats[circuit_ids[mapper_item]] = {
-                "session_uptime": uptime_data[mapper_item],
-                }
-        except KeyError as e:
-            print(f'Key error: {e}')
-            pass  # some data missing for interface ID, just ignoring it
-
-    print('Done')
-    return (users_stats)
-
-
 def get_usage(auth_data, SNMP_target):
     # launching threads to collect data.
     # if more indexes is requred it is good time to conver it to loop.
 
+    # getting usernames circuit_ids[L2TPtunnel.LTPSession] = userename
     circuit_ids = {}
-    t1 = threading.Thread(target=get_l2tp_users, args=(SNMP_target, auth_data, circuit_ids))
+    t1 = threading.Thread(target=get_l2tp_session_stats, args=(SNMP_target, auth_data, circuit_ids,'.1.3.6.1.4.1.9.10.24.1.3.2.1.2.2'))
     t1.start()
 
     interface_IDs = {}
-    t2 = threading.Thread(target=get_interface_ids, args=(SNMP_target, auth_data, interface_IDs))
+    t2 = threading.Thread(target=get_l2tp_session_stats, args=(SNMP_target, auth_data, interface_IDs,'1.3.6.1.4.1.9.10.24.1.3.2.1.11',True))
     t2.start()
 
     interface_RX_data = {}
@@ -221,16 +104,9 @@ def get_usage(auth_data, SNMP_target):
     t4 = threading.Thread(target=get_int_stats, args=(SNMP_target, auth_data, interface_TX_data, '1.3.6.1.2.1.2.2.1.16'))
     t4.start()
 
+    # getting uptime data circuit_ids[L2TPtunnel.LTPSession] = uptimeclicks
     uptime_data = {}
-    """ 
-    datastructure like, where the first element is the mapper, second is a string of timedelta:
-
-    {
-    '9796.787': '36 days, 11:34:49.100000',
-    '9796.787': '36 days, 11:34:49.100000'
-     }
-    """
-    t5 = threading.Thread(target=collect_session_data_from_lns, args=(SNMP_target, auth_data, uptime_data, '1.3.6.1.4.1.9.10.24.1.3.2.1.4'))
+    t5 = threading.Thread(target=get_l2tp_session_stats, args=(SNMP_target, auth_data, uptime_data, '1.3.6.1.4.1.9.10.24.1.3.2.1.4'))
     t5.start()
 
     t1.join()
@@ -239,7 +115,12 @@ def get_usage(auth_data, SNMP_target):
     t4.join()
     t5.join()
 
-    # print(next(iter(circuit_ids.items())),next(iter(interface_IDs.items())),next(iter(interface_RX_data.items())))
+    """  # Just some ugly test output
+    print("\ncircuit_ids",next(iter(circuit_ids.items())),
+    "\ninterface_IDs", next(iter(interface_IDs.items())),
+    "\ninterface_RX_data", next(iter(interface_RX_data.items())),
+    "\nuptime_data", next(iter(uptime_data.items())))
+    """
 
     print('Combining collected data')
     users_stats = {}
@@ -248,16 +129,10 @@ def get_usage(auth_data, SNMP_target):
             users_stats[circuit_ids[interface_IDs[interface_ID]]] = {
                 "RX_Octets": interface_RX_data[interface_ID],
                 "TX_Octets": interface_TX_data[interface_ID],
+                "session_uptime": int(uptime_data[interface_IDs[interface_ID]])
                 }
         except KeyError as e:
             pass  # some data missing for interface ID, just ignoring it
-
-    # Mapping on a different item, needs a separate loop
-    for interface_ID, mapper_item in interface_IDs.items():
-        try:
-            users_stats[circuit_ids[mapper_item]]["session_uptime"] = uptime_data[mapper_item]
-        except KeyError as e:
-            print(f'Key error mapping session_uptime: {e}')
 
     print('Done')
     return (users_stats)
@@ -308,10 +183,10 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             except KeyError:
                 pass
 
-        response += "# TYPE Sessions Uptime\n"
+        response += "# TYPE sessionUpTime counter\n"
         for username in users_stats.keys():
             try:
-                response += 'sessionUpTime{ user="' + username + '" } ' + str(users_stats[username]['session_uptime']) + '\n'
+                response += 'sessionUpTime{ user="' + username + '" } ' + str(users_stats[username]['session_uptime']/100) + '\n'
             except KeyError:
                 pass
 
@@ -332,12 +207,6 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
         self._set_headers_404()
         return ()
         self._set_headers()
-
-
-# Promethius part
-# users_stats = get_usage(auth_data,SNMP_target)
-
-# HTTP_PORT_NUMBER
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Per-User traffic stats Pronethetius exporter for Cisco LNS.')
