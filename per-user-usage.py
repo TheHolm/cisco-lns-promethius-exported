@@ -1,11 +1,12 @@
 import datetime
 
 from pysnmp.hlapi import nextCmd, SnmpEngine, ContextData, ObjectType, ObjectIdentity, CommunityData, UdpTransportTarget
-import http.server
 import threading
+import http.server
 import argparse
 import time
 
+import multiprocessing as mp
 
 def get_l2tp_session_stats(SNMP_target, auth_data, results,OID,data_as_index=False):
     # getting info about l2tp session
@@ -87,33 +88,41 @@ def get_usage(auth_data, SNMP_target):
     # launching threads to collect data.
     # if more indexes is requred it is good time to conver it to loop.
 
+    # if you need to use threading for multuporcessing comment next 3 lines and uncoment 2 after that.
+    # you can also comment out "import multiprocessing as mp" line at the begining of this file
+    manager = mp.Manager()
+    spawn_worker = mp.Process
+    create_dict =  manager.dict
+    # spawn_worker = threading.Thread
+    # create_dict = dict
+
     # getting usernames circuit_ids[L2TPtunnel.LTPSession] = userename
-    circuit_ids = {}
-    t1 = threading.Thread(target=get_l2tp_session_stats, args=(SNMP_target, auth_data, circuit_ids,'.1.3.6.1.4.1.9.10.24.1.3.2.1.2.2'))
-    t1.start()
+    circuit_ids = create_dict()
+    w1 = spawn_worker(target=get_l2tp_session_stats, args=(SNMP_target, auth_data, circuit_ids,'.1.3.6.1.4.1.9.10.24.1.3.2.1.2.2') )
+    w1.start()
 
-    interface_IDs = {}
-    t2 = threading.Thread(target=get_l2tp_session_stats, args=(SNMP_target, auth_data, interface_IDs,'1.3.6.1.4.1.9.10.24.1.3.2.1.11',True))
-    t2.start()
+    interface_IDs = create_dict()
+    w2 = spawn_worker(target=get_l2tp_session_stats, args=(SNMP_target, auth_data, interface_IDs,'1.3.6.1.4.1.9.10.24.1.3.2.1.11',True))
+    w2.start()
 
-    interface_RX_data = {}
-    t3 = threading.Thread(target=get_int_stats, args=(SNMP_target, auth_data, interface_RX_data, '1.3.6.1.2.1.2.2.1.10'))
-    t3.start()
+    interface_RX_data = create_dict()
+    w3 = spawn_worker(target=get_int_stats, args=(SNMP_target, auth_data, interface_RX_data, '1.3.6.1.2.1.2.2.1.10'))
+    w3.start()
 
-    interface_TX_data = {}
-    t4 = threading.Thread(target=get_int_stats, args=(SNMP_target, auth_data, interface_TX_data, '1.3.6.1.2.1.2.2.1.16'))
-    t4.start()
+    interface_TX_data = create_dict()
+    w4 = spawn_worker(target=get_int_stats, args=(SNMP_target, auth_data, interface_TX_data, '1.3.6.1.2.1.2.2.1.16'))
+    w4.start()
 
     # getting uptime data circuit_ids[L2TPtunnel.LTPSession] = uptimeclicks
-    uptime_data = {}
-    t5 = threading.Thread(target=get_l2tp_session_stats, args=(SNMP_target, auth_data, uptime_data, '1.3.6.1.4.1.9.10.24.1.3.2.1.4'))
-    t5.start()
+    uptime_data = create_dict()
+    w5 = spawn_worker(target=get_l2tp_session_stats, args=(SNMP_target, auth_data, uptime_data, '1.3.6.1.4.1.9.10.24.1.3.2.1.4'))
+    w5.start()
 
-    t1.join()
-    t2.join()
-    t3.join()
-    t4.join()
-    t5.join()
+    w1.join()
+    w2.join()
+    w3.join()
+    w4.join()
+    w5.join()
 
     """  # Just some ugly test output
     print("\ncircuit_ids",next(iter(circuit_ids.items())),

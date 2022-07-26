@@ -71,10 +71,19 @@ scrape_configs:
 
 To get usage, submit a GET request to /?target=yourlns.example.com
 
+## Release history
+
+* 1.0 - Initial release
+* 1.1 - Collection of sessions up-time was added.
+* 1.2 - Switched to use multiprocessing instead of threading to improve scalability
+
 ## Q/A
 
 1. Q: Why SNMP walk not SNMP Bulk.
    A: For some reason SNMP Bulk does not return sane results, I have no idea what causing it. Walking is working just fine for me.
+
+1. Q: After release 1.2 exporter does not work properly because python multiprocessing is not properly supported on my platform
+   A: You can always switch to old "threading" behaviour. Just comment/uncomment some lines as described in line 91 of "per-user-usage.py"
 
 ## To Do
 
