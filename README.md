@@ -79,10 +79,10 @@ To get usage, submit a GET request to /?target=yourlns.example.com
 
 ## Q/A
 
-1. Q: Why SNMP walk not SNMP Bulk.
+1. Q: Why SNMP walk not SNMP Bulk.      
    A: For some reason SNMP Bulk does not return sane results, I have no idea what causing it. Walking is working just fine for me.
 
-1. Q: After release 1.2 exporter does not work properly because python multiprocessing is not properly supported on my platform
+1. Q: After release 1.2 exporter does not work properly because python multiprocessing is not properly supported on my platform      
    A: You can always switch to old "threading" behaviour. Just comment/uncomment some lines as described in line 91 of "per-user-usage.py"
 
 ## To Do
